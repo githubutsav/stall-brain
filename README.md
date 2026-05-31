@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/PS--11-Hyperlocal%20demand%20forecasting%20for%20Hazratganj%20Demand%20Forecasting-F59E0B?style=for-the-badge" />
+<img src="https://img.shields.io/badge/PS--11-PS--11%20%C2%B7%20Hyperlocal%20Demand%20Forecasting-F59E0B?style=for-the-badge" />
 &nbsp;
 
 &nbsp;
@@ -62,44 +62,51 @@ The AI doesn't just answer a prompt. It **reasons across multiple data signals**
 
 ## ✨ Features
 
-**Stall Profiles**
-Seven vendor types built around Lucknow's actual street economy — Chaat Stall, Chai Tapri, Juice Corner, Flower Vendor, Bhutta Stall, Snacks & Namkeen, and Balloon Seller — each with pre-loaded default inventory.
+**Vendor Auth & Persistent Profiles**
+Users sign up, log in, and keep their stall profile saved across sessions.
 
-**Editable Inventory**
-Vendors can add, remove, or rename items in their stall list before forecasting. The AI uses only the vendor's actual items — no generic suggestions.
+**Stall Type Selection (7 types)**
+Seven vendor archetypes tailored to Hazratganj: Chaat, Chai, Juice, Flowers, Bhutta, Snacks & Namkeen, Balloon & Toy.
 
-**Live Lucknow Weather**
-Fetches real-time weather from Open-Meteo using Hazratganj's exact coordinates (26.85°N, 80.95°E) and maps conditions to footfall impact multipliers. Rain doesn't just mean "bad weather" — it means 0.4x footfall for chaat but a boost for bhutta.
+**Editable Ingredient Lists**
+Profile ingredients are fully editable: add, remove, or rename items before saving.
+
+**Current Inventory Input**
+Vendors enter what they already have per item (quantity + unit), so the AI recommends only what to buy today.
+
+**Live Lucknow Weather (Open-Meteo)**
+Real-time weather for Hazratganj coordinates drives footfall impact multipliers.
 
 **Lucknow Event Radar**
-A built-in calendar of local events — Lucknow Mahotsav, Navratri, IPL LSG home matches at Ekana, public holidays, and weekly footfall patterns — feeds into the demand calculation before the AI ever sees the prompt.
+Local events and weekly patterns feed the demand calculation before the AI prompt is built.
 
 **Demand Multiplier Engine**
-Before calling the LLM, the system computes:
+The system computes:
 
 ```
 Demand Multiplier = Weather Impact × Event Impact × Day-of-Week Pattern
 ```
 
-This structured signal is passed to the model, grounding the AI output in real numbers rather than vibes.
+**Smart Procurement Output**
+Each item returns Total Needed, You Have, and Buy Today with priorities and notes.
 
-**Bilingual Output**
-Every forecast is available in English and Hindi (Devanagari), because a tool is only useful if the vendor can actually read it.
+**Bilingual Output (EN + HI)**
+Forecasts include English and Hindi summaries with a one-click toggle.
 
-**Forecast History & Feedback**
-Past forecasts are stored locally. Vendors can mark predictions as accurate or not, creating a personal accuracy log over time.
+**Forecast History & Feedback Loop**
+Runs are stored locally with feedback and inventory snapshots for future reference.
 
 ---
 
 ## 🗺️ App Flow
 
 ```
-Landing Page  →  Setup Page  →  Forecast Page
-(welcome +        (pick stall      (live signals +
- how it works)     + edit items)    AI output)
+Landing  →  Profile Setup  →  Forecast Page  →  AI Output
+(welcome)    (stall +          (inventory +       (buy today
+			 ingredients)       session edits)    breakdown)
 ```
 
-The app is structured across three pages with a clear stepper, ensuring vendors always know where they are and what to do next.
+Your stall profile saves permanently. Each forecast lets you make temporary adjustments — add a seasonal item, remove something you're skipping today — without touching your saved profile.
 
 ---
 
@@ -109,11 +116,12 @@ The app is structured across three pages with a clear stepper, ensuring vendors 
 |---|---|
 | Frontend | React 19 + Vite |
 | Styling | Tailwind CSS v4 + CSS Variables |
+| Auth | Supabase (signup / login / session) |
 | Routing | React Router v6 |
 | AI / LLM | Groq API — `llama-3.3-70b-versatile` |
 | Weather | Open-Meteo API (free, no key required) |
 | Icons | Lucide React |
-| Storage | localStorage (forecast history + feedback) |
+| Storage | Supabase (auth) + localStorage (forecast history, session) |
 | Deployment | Vercel |
 
 Coding Agent used : Copilot with GPT Codex
@@ -123,26 +131,77 @@ Coding Agent used : Copilot with GPT Codex
 
 High-level: Client SPA → Signal Engine → Agent → LLM → UI & Storage
 
+File structure:
 
-Key components:
-
-- Frontend: `src/main.jsx`, `src/App.jsx` (routing), `src/pages/*`, `src/components/*`
-- Signal engine: `src/utils/weatherLogic.js` (weather/event → multipliers)
-- Agent: `src/utils/groqAgent.js` (prompt assembly, POST → Groq)
-- Storage: `src/utils/selectionStorage.js` (localStorage)
-- Static data: `src/data/stalls.js`, `src/data/events.js`
-- Env: `VITE_GROQ_API_KEY`
-- Deployment: Vercel (static)
+```
+src/
+	pages/
+		LandingPage.jsx
+		ProfilePage.jsx
+		ForecastPage.jsx
+	components/
+		Header.jsx
+		StallSelector.jsx
+		IngredientEditor.jsx
+		InventoryInput.jsx
+		SignalPanel.jsx
+		LoadingState.jsx
+		ForecastOutput.jsx
+		FeedbackBar.jsx
+		HistoryLog.jsx
+	utils/
+		groqAgent.js
+		weatherLogic.js
+		selectionStorage.js
+	data/
+		stalls.js
+		events.js
+```
 
 Data contracts:
 
-- `DemandMultiplier` = { weather: number, event: number, weekday: number, combined: number }
-- `ForecastRequest` = { stallType: string, items: [{ name: string, baseQty: number }], multipliers: DemandMultiplier, locale: 'en' | 'hi' }
+```
+UserProfile = {
+	stallType,
+	stallLabel,
+	stallEmoji,
+	ingredients[]
+}
 
-Integration:
+ForecastSession = {
+	sessionIngredients[],
+	inventory: { [item]: { quantity, unit } }
+}
 
-- Open-Meteo: GET /weather → `weatherLogic`
-- Groq LLM: POST /v1/predict ← `groqAgent.js` (JSON payload)
+DemandMultiplier = {
+	weather,
+	event,
+	weekday,
+	combined
+}
+
+ProcurementItem = {
+	item,
+	totalNeeded,
+	alreadyHave,
+	toBuy,
+	unit,
+	priority,
+	note
+}
+
+ForecastResult = {
+	summary,
+	hindiSummary,
+	expectedCustomers,
+	peakHours,
+	confidenceLevel,
+	confidenceReason,
+	procurementList[],
+	sufficientStockItems[],
+	specialAdvice
+}
+```
 
 
 ---
@@ -178,6 +237,7 @@ Open [http://localhost:5173](http://localhost:5173).
 - **WhatsApp delivery** — send the daily forecast directly to a vendor's phone each morning
 - **Crowdsourced social signals** — parse local hashtags like `#Hazratganj` and `#LucknowFoodies` to catch viral footfall spikes
 - **Group buying** — aggregate demand across nearby vendors to unlock wholesale pricing on shared items
+- **Revenue estimator** — vendor inputs selling price per item; app calculates expected daily earnings vs procurement cost
 
 ---
 
