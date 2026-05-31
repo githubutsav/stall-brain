@@ -4,7 +4,7 @@ const socialLinks = ["LinkedIn", "Twitter", "YouTube", "Instagram"];
 
 export default function Footer() {
   return (
-    <footer className="pb-12 pt-10">
+    <footer className="pb-4 pt-10">
       <div className="mx-auto w-full max-w-6xl px-6">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
           <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
