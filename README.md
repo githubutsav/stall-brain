@@ -35,7 +35,7 @@ combining live weather, local events, and custom inventory to deliver daily proc
 
 ---
 
-## 🎯 Problem Statement — PS-11
+## 🎯 Problem Statement 
 
 > *"Hazratganj's iconic street market has vendors who over-stock or under-stock daily, leading to waste and lost revenue. Build an agent that reads footfall patterns, weather, local events, and social buzz to recommend optimal daily procurement."*
 >
