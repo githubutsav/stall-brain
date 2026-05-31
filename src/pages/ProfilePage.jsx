@@ -99,6 +99,7 @@ export default function ProfilePage() {
     setItems(saved.ingredients)
     setError('')
     setToast('Profile saved! Your stall is ready.')
+    navigate('/forecast')
   }
 
   const handleLogout = async () => {

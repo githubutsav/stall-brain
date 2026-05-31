@@ -16,6 +16,14 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const getPostAuthRoute = (user) => {
+    if (!user) return "/signup";
+    const { creationTime, lastSignInTime } = user.metadata ?? {};
+    const isFirstLogin =
+      Boolean(creationTime && lastSignInTime) && creationTime === lastSignInTime;
+    return isFirstLogin ? "/profile" : "/forecast";
+  };
+
   useEffect(() => {
     let active = true;
     setIsLoading(true);
@@ -23,7 +31,7 @@ export default function SignupPage() {
       .then((result) => {
         if (!active) return;
         if (result?.user) {
-          navigate("/forecast");
+          navigate(getPostAuthRoute(result.user));
         }
       })
       .catch((authError) => {
@@ -45,8 +53,8 @@ export default function SignupPage() {
     setError("");
     setIsLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      navigate("/forecast");
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      navigate(getPostAuthRoute(credential.user));
     } catch (authError) {
       setError(authError.message || "Unable to sign up.");
     } finally {
@@ -59,8 +67,8 @@ export default function SignupPage() {
     setIsLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      navigate("/forecast");
+      const credential = await signInWithPopup(auth, provider);
+      navigate(getPostAuthRoute(credential.user));
     } catch (authError) {
       const shouldRedirect =
         authError?.code === "auth/popup-blocked" ||

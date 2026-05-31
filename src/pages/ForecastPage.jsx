@@ -13,7 +13,6 @@ import { requestGroqForecast } from '../utils/groqAgent'
 import { getTodayInfo } from '../utils/dateTime'
 import { loadProfile } from '../utils/profileStorage'
 import {
-  clearForecastSession,
   createSessionFromProfile,
   INVENTORY_UNITS,
   loadForecastSession,
@@ -245,25 +244,6 @@ export default function ForecastPage() {
     }
   }, [stall?.id])
 
-  const handleStartOver = () => {
-    clearForecastSession()
-    if (profile) {
-      const nextSession = createSessionFromProfile(profile)
-      setSessionIngredients(nextSession.sessionIngredients)
-      setInventory(nextSession.inventory)
-    } else {
-      setSessionIngredients([])
-      setInventory({})
-    }
-    setItemError('')
-    setForecast(null)
-    setShowHindi(false)
-    setErrorState(null)
-    setFeedback(null)
-    setCurrentHistoryId(null)
-    setPhase(weather ? 'signalsReady' : 'loadingSignals')
-  }
-
   const handleRemoveItem = (itemName) => {
     setSessionIngredients((prev) => prev.filter((item) => item !== itemName))
     setInventory((prev) => {
@@ -432,13 +412,6 @@ export default function ForecastPage() {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handleStartOver}
-              className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-transparent px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-card-hover)]"
-            >
-              Start Over
-            </button>
             <Link
               to="/profile"
               className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-transparent px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-card-hover)]"
