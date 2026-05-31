@@ -27,7 +27,7 @@ export default function CTA() {
             <div className="flex flex-wrap gap-4">
               <Link
                 className="rounded-full bg-amber-300 px-6 py-3 text-sm font-semibold text-black transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(251,191,36,0.35)]"
-                to="/setup"
+                to="/forecast"
               >
                 Get Forecast
               </Link>

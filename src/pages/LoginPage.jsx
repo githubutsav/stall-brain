@@ -23,7 +23,7 @@ export default function LoginPage() {
       .then((result) => {
         if (!active) return;
         if (result?.user) {
-          navigate("/setup");
+          navigate("/forecast");
         }
       })
       .catch((authError) => {
@@ -46,7 +46,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate("/setup");
+      navigate("/forecast");
     } catch (authError) {
       setError(authError.message || "Unable to sign in.");
     } finally {
@@ -60,7 +60,7 @@ export default function LoginPage() {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      navigate("/setup");
+      navigate("/forecast");
     } catch (authError) {
       const shouldRedirect =
         authError?.code === "auth/popup-blocked" ||

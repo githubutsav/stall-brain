@@ -63,12 +63,20 @@ export default function Navbar() {
         <div className="hidden items-center gap-3 md:flex">
           {authReady ? (
             isLoggedIn ? (
-              <Link
-                className="rounded-full bg-amber-300 px-4 py-2 text-sm font-semibold text-black transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(251,191,36,0.35)]"
-                to="/setup"
-              >
-                Get Forecast
-              </Link>
+              <>
+                <Link
+                  className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white/80 transition duration-300 hover:border-white/40 hover:text-white"
+                  to="/profile"
+                >
+                  Profile
+                </Link>
+                <Link
+                  className="rounded-full bg-amber-300 px-4 py-2 text-sm font-semibold text-black transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(251,191,36,0.35)]"
+                  to="/forecast"
+                >
+                  Get Forecast
+                </Link>
+              </>
             ) : (
               <Link
                 className="rounded-full border border-white/10 px-4 py-2 text-sm text-white/80 transition duration-300 hover:border-white/40 hover:text-white"
@@ -126,13 +134,22 @@ export default function Navbar() {
           <div className="flex flex-col gap-3 pt-2">
             {authReady ? (
               isLoggedIn ? (
-                <Link
-                  className="w-full rounded-full bg-amber-300 px-4 py-2 text-center text-sm font-semibold text-black transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(251,191,36,0.35)]"
-                  onClick={() => setIsOpen(false)}
-                  to="/setup"
-                >
-                  Get Forecast
-                </Link>
+                <>
+                  <Link
+                    className="w-full rounded-full border border-white/20 px-4 py-2 text-center text-sm font-semibold text-white/80 transition duration-300 hover:border-white/40 hover:text-white"
+                    onClick={() => setIsOpen(false)}
+                    to="/profile"
+                  >
+                    Profile
+                  </Link>
+                  <Link
+                    className="w-full rounded-full bg-amber-300 px-4 py-2 text-center text-sm font-semibold text-black transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(251,191,36,0.35)]"
+                    onClick={() => setIsOpen(false)}
+                    to="/forecast"
+                  >
+                    Get Forecast
+                  </Link>
+                </>
               ) : (
                 <Link
                   className="w-full rounded-full border border-white/10 px-4 py-2 text-center text-sm text-white/80 transition duration-300 hover:border-white/40 hover:text-white"

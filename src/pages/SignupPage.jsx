@@ -23,7 +23,7 @@ export default function SignupPage() {
       .then((result) => {
         if (!active) return;
         if (result?.user) {
-          navigate("/setup");
+          navigate("/forecast");
         }
       })
       .catch((authError) => {
@@ -46,7 +46,7 @@ export default function SignupPage() {
     setIsLoading(true);
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      navigate("/setup");
+      navigate("/forecast");
     } catch (authError) {
       setError(authError.message || "Unable to sign up.");
     } finally {
@@ -60,7 +60,7 @@ export default function SignupPage() {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      navigate("/setup");
+      navigate("/forecast");
     } catch (authError) {
       const shouldRedirect =
         authError?.code === "auth/popup-blocked" ||

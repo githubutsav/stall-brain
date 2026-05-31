@@ -1,17 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, Navigate, useLocation } from 'react-router-dom'
+import { X } from 'lucide-react'
 import Header from '../components/Header'
 import SignalPanel from '../components/SignalPanel'
 import ForecastOutput from '../components/ForecastOutput'
 import FeedbackBar from '../components/FeedbackBar'
 import HistoryLog from '../components/HistoryLog'
 import LoadingState from '../components/LoadingState'
-import { stalls } from '../data/stalls'
 import { getEventsForDate, getWeeklyMultiplier } from '../data/events'
 import { getWeatherSignal } from '../utils/weatherLogic'
 import { requestGroqForecast } from '../utils/groqAgent'
 import { getTodayInfo } from '../utils/dateTime'
-import { clearSelection, loadSelection } from '../utils/selectionStorage'
+import { loadProfile } from '../utils/profileStorage'
+import {
+  clearForecastSession,
+  createSessionFromProfile,
+  INVENTORY_UNITS,
+  loadForecastSession,
+  saveForecastSession,
+} from '../utils/forecastSessionStore'
 
 const WEATHER_URL =
   'https://api.open-meteo.com/v1/forecast?latitude=26.85&longitude=80.95&current=temperature_2m,weathercode,windspeed_10m&daily=weathercode,temperature_2m_max,precipitation_sum&timezone=Asia%2FKolkata&forecast_days=1'
@@ -47,6 +54,20 @@ const ERROR_COPY = {
   },
 }
 
+function buildInventorySnapshot(items, inventory) {
+  return items.reduce((acc, item) => {
+    const entry = inventory?.[item] ?? {}
+    const quantity = Number(entry.quantity)
+    const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 0
+    const unit =
+      typeof entry.unit === 'string' && entry.unit.trim()
+        ? entry.unit
+        : INVENTORY_UNITS[0]
+    acc[item] = { quantity: safeQuantity, unit }
+    return acc
+  }, {})
+}
+
 function loadHistory() {
   if (typeof window === 'undefined') return []
   try {
@@ -76,14 +97,29 @@ function getErrorDetails(code) {
 }
 
 export default function ForecastPage() {
-  const navigate = useNavigate()
-  const selection = useMemo(() => loadSelection(), [])
+  const location = useLocation()
+  const [profile, setProfile] = useState(() => loadProfile())
   const dateInfo = useMemo(() => getTodayInfo(), [])
+  const [sessionIngredients, setSessionIngredients] = useState([])
+  const [inventory, setInventory] = useState({})
+  const [newItem, setNewItem] = useState('')
+  const [itemError, setItemError] = useState('')
+  const [sessionReady, setSessionReady] = useState(false)
+
   const stall = useMemo(() => {
-    if (!selection?.stallId) return null
-    return stalls.find((entry) => entry.id === selection.stallId) ?? null
-  }, [selection?.stallId])
-  const items = selection?.items ?? []
+    if (!profile) return null
+    return {
+      id: profile.stallType,
+      name: profile.stallLabel,
+      emoji: profile.stallEmoji,
+      items: profile.ingredients,
+    }
+  }, [
+    profile?.stallType,
+    profile?.stallLabel,
+    profile?.stallEmoji,
+    profile?.ingredients,
+  ])
 
   const [phase, setPhase] = useState('loadingSignals')
   const [weather, setWeather] = useState(null)
@@ -96,8 +132,6 @@ export default function ForecastPage() {
   const [history, setHistory] = useState([])
   const [currentHistoryId, setCurrentHistoryId] = useState(null)
   const [historyOpen, setHistoryOpen] = useState(false)
-
-  const hasTriggered = useRef(false)
 
   const eventsToday = useMemo(() => {
     return getEventsForDate(dateInfo.dateString)
@@ -122,6 +156,30 @@ export default function ForecastPage() {
   useEffect(() => {
     setHistory(loadHistory())
   }, [])
+
+  useEffect(() => {
+    setProfile(loadProfile())
+  }, [location.key])
+
+  useEffect(() => {
+    if (!profile) return
+    const storedSession = loadForecastSession()
+    const nextSession = storedSession ?? createSessionFromProfile(profile)
+    setSessionIngredients(nextSession.sessionIngredients)
+    setInventory(nextSession.inventory)
+    setSessionReady(true)
+  }, [profile])
+
+  useEffect(() => {
+    if (!sessionReady) return
+    saveForecastSession({ sessionIngredients, inventory })
+  }, [sessionIngredients, inventory, sessionReady])
+
+  useEffect(() => {
+    if (sessionIngredients.length > 0 && itemError) {
+      setItemError('')
+    }
+  }, [sessionIngredients, itemError])
 
   useEffect(() => {
     if (!stall) return
@@ -169,13 +227,13 @@ export default function ForecastPage() {
           getWeatherSignal(Number.isFinite(weathercode) ? weathercode : 0),
         )
         setFallbackWeather(false)
-        setPhase('signalsReady')
+        setPhase((prev) => (prev === 'loadingSignals' ? 'signalsReady' : prev))
       } catch (error) {
         if (!active) return
         setWeather({ ...FALLBACK_WEATHER })
         setWeatherSignal(getWeatherSignal(FALLBACK_WEATHER.weathercode))
         setFallbackWeather(true)
-        setPhase('signalsReady')
+        setPhase((prev) => (prev === 'loadingSignals' ? 'signalsReady' : prev))
       }
     }
 
@@ -185,16 +243,95 @@ export default function ForecastPage() {
       active = false
       controller.abort()
     }
-  }, [stall])
+  }, [stall?.id])
+
+  const handleStartOver = () => {
+    clearForecastSession()
+    if (profile) {
+      const nextSession = createSessionFromProfile(profile)
+      setSessionIngredients(nextSession.sessionIngredients)
+      setInventory(nextSession.inventory)
+    } else {
+      setSessionIngredients([])
+      setInventory({})
+    }
+    setItemError('')
+    setForecast(null)
+    setShowHindi(false)
+    setErrorState(null)
+    setFeedback(null)
+    setCurrentHistoryId(null)
+    setPhase(weather ? 'signalsReady' : 'loadingSignals')
+  }
+
+  const handleRemoveItem = (itemName) => {
+    setSessionIngredients((prev) => prev.filter((item) => item !== itemName))
+    setInventory((prev) => {
+      const next = { ...prev }
+      delete next[itemName]
+      return next
+    })
+  }
+
+  const handleAddItem = () => {
+    const trimmed = newItem.trim()
+    if (!trimmed) return
+
+    setSessionIngredients((prev) => {
+      const exists = prev.some(
+        (item) => item.toLowerCase() === trimmed.toLowerCase(),
+      )
+      if (exists) return prev
+      return [...prev, trimmed]
+    })
+    setInventory((prev) => ({
+      ...prev,
+      [trimmed]: prev[trimmed] ?? { quantity: 0, unit: INVENTORY_UNITS[0] },
+    }))
+    setNewItem('')
+  }
+
+  const handleInventoryChange = (itemName, field, value) => {
+    setInventory((prev) => {
+      const current = prev[itemName] ?? { quantity: 0, unit: INVENTORY_UNITS[0] }
+      if (field === 'quantity') {
+        const quantity = Number(value)
+        return {
+          ...prev,
+          [itemName]: {
+            ...current,
+            quantity:
+              Number.isFinite(quantity) && quantity >= 0 ? quantity : 0,
+          },
+        }
+      }
+      return {
+        ...prev,
+        [itemName]: {
+          ...current,
+          unit: value,
+        },
+      }
+    })
+  }
 
   const handleForecast = async () => {
     if (!stall) return
+    if (sessionIngredients.length < 1) {
+      setItemError('Add at least one item to get a forecast.')
+      return
+    }
 
     setPhase('loadingForecast')
     setErrorState(null)
     setForecast(null)
     setShowHindi(false)
     setFeedback(null)
+
+    const inventorySnapshot = buildInventorySnapshot(
+      sessionIngredients,
+      inventory,
+    )
 
     const delay = new Promise((resolve) => {
       setTimeout(resolve, LOADING_DURATION)
@@ -203,7 +340,8 @@ export default function ForecastPage() {
     try {
       const forecastPromise = requestGroqForecast({
         stall,
-        items,
+        items: sessionIngredients,
+        inventory: inventorySnapshot,
         dateLabel: dateInfo.dateLabel,
         dayName: dateInfo.dayName,
         weather: effectiveWeather,
@@ -227,6 +365,7 @@ export default function ForecastPage() {
         demandMultiplier: Number(demandMultiplier.toFixed(2)),
         summary: result.summary,
         feedback: null,
+        inventorySnapshot,
       }
 
       setCurrentHistoryId(entryId)
@@ -248,12 +387,6 @@ export default function ForecastPage() {
     }
   }
 
-  useEffect(() => {
-    if (!stall || hasTriggered.current || phase !== 'signalsReady') return
-    hasTriggered.current = true
-    handleForecast()
-  }, [stall, phase])
-
   const handleFeedback = (value) => {
     setFeedback(value)
     if (!currentHistoryId) return
@@ -266,14 +399,26 @@ export default function ForecastPage() {
     })
   }
 
-
-  if (!stall || items.length < 1 || !selection?.confirmed) {
-    return <Navigate to="/setup" replace />
+  if (!profile || !stall) {
+    return (
+      <Navigate
+        to="/profile"
+        replace
+        state={{
+          banner: 'Set up your stall profile first to get your forecast.',
+        }}
+      />
+    )
   }
 
   const errorDetails = errorState ? getErrorDetails(errorState) : null
   const showForecast = Boolean(phase === 'forecastReady' && forecast)
   const showError = Boolean(phase === 'error' && errorDetails)
+  const itemsTodayLabel = `${sessionIngredients.length} items today`
+  const stockCount = sessionIngredients.filter((item) => {
+    const quantity = Number(inventory?.[item]?.quantity ?? 0)
+    return Number.isFinite(quantity) && quantity > 0
+  }).length
 
   return (
     <main className="relative min-h-screen">
@@ -285,26 +430,42 @@ export default function ForecastPage() {
             <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-1">
               {dateInfo.dateLabel}
             </span>
-            <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-1">
-              {stall.name}
-            </span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => {
-                clearSelection()
-                navigate('/')
-              }}
+              onClick={handleStartOver}
               className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-transparent px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-card-hover)]"
             >
               Start Over
             </button>
             <Link
-              to="/setup"
+              to="/profile"
               className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-transparent px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-card-hover)]"
             >
-              Edit Items
+              Profile
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{stall.emoji}</span>
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-[var(--color-text-muted)]">
+                  Stall identity
+                </p>
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  {stall.name}
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/profile"
+              className="text-sm font-semibold text-[var(--color-primary)] transition hover:text-[var(--color-primary-dark)]"
+            >
+              Edit in Profile -
             </Link>
           </div>
         </div>
@@ -319,6 +480,145 @@ export default function ForecastPage() {
           fallbackWeather={fallbackWeather}
           loading={phase === 'loadingSignals'}
         />
+
+        <section className="mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+                Today&apos;s Items
+              </h2>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                These are loaded from your profile. Add or remove items just for
+                today - your profile won&apos;t change.
+              </p>
+            </div>
+            <span className="text-sm font-semibold text-[var(--color-text-secondary)]">
+              {itemsTodayLabel}
+            </span>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
+            <div className="space-y-3">
+              {sessionIngredients.length ? (
+                sessionIngredients.map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-4 py-3"
+                  >
+                    <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                      {item}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(item)}
+                      className="rounded-full border border-transparent p-1 text-[var(--color-text-muted)] transition hover:border-[var(--color-danger)] hover:text-[var(--color-danger)]"
+                      aria-label={`Remove ${item}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-4 py-3 text-sm text-[var(--color-text-muted)]">
+                  Add at least one item to get a forecast.
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2 focus-within:border-[var(--color-border-focus)]">
+              <input
+                value={newItem}
+                onChange={(event) => setNewItem(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    handleAddItem()
+                  }
+                }}
+                placeholder="Add item for today..."
+                className="flex-1 bg-transparent text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="inline-flex items-center gap-2 rounded-full bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[#0D0D0D] transition hover:bg-[var(--color-primary-dark)]"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {itemError ? (
+            <p className="mt-3 text-sm text-[var(--color-danger)]">
+              {itemError}
+            </p>
+          ) : null}
+        </section>
+
+        <section className="mt-8">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              What do you already have?
+            </h2>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+              Tell us what stock you already have. The AI will only recommend
+              what you still need to buy.
+            </p>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {sessionIngredients.map((item) => (
+              <div
+                key={`inventory-${item}`}
+                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4"
+              >
+                <div className="grid gap-3 sm:grid-cols-[1fr_110px_130px]">
+                  <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                    {item}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={inventory?.[item]?.quantity ?? 0}
+                    onChange={(event) =>
+                      handleInventoryChange(item, 'quantity', event.target.value)
+                    }
+                    placeholder="0 (leave blank if none)"
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)]"
+                  />
+                  <select
+                    value={inventory?.[item]?.unit ?? INVENTORY_UNITS[0]}
+                    onChange={(event) =>
+                      handleInventoryChange(item, 'unit', event.target.value)
+                    }
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)]"
+                  >
+                    {INVENTORY_UNITS.map((unit) => (
+                      <option key={unit} value={unit}>
+                        {unit}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+            You have stock for {stockCount} of {sessionIngredients.length} items
+          </p>
+        </section>
+
+        <div className="mt-8">
+          <button
+            type="button"
+            onClick={handleForecast}
+            disabled={sessionIngredients.length < 1}
+            className="w-full rounded-2xl bg-[var(--color-primary)] px-6 py-4 text-base font-semibold text-[#0D0D0D] shadow-[0_0_30px_var(--color-primary-glow)] transition hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Get Today&apos;s Forecast -
+          </button>
+        </div>
 
         {phase === 'loadingForecast' ? <LoadingState active /> : null}
 

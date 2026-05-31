@@ -92,7 +92,7 @@ export default function HomePage() {
 
           <div className="flex flex-wrap items-center gap-4">
             <Link
-              to="/setup"
+              to="/forecast"
               className="inline-flex items-center justify-center rounded-md bg-[var(--color-primary)] px-8 py-4 text-base font-semibold text-[#0D0D0D] shadow-[0_0_30px_var(--color-primary-glow)] transition hover:bg-[var(--color-primary-dark)]"
             >
               Get Today&apos;s Forecast

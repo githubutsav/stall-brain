@@ -46,6 +46,9 @@ export default function ForecastOutput({
   const procurementList = [...(forecast.procurementList || [])].sort((a, b) => {
     return (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3)
   })
+  const sufficientStockItems = Array.isArray(forecast.sufficientStockItems)
+    ? forecast.sufficientStockItems
+    : []
 
   const { en: adviceEn, hi: adviceHi } = splitAdvice(forecast.specialAdvice)
   const summaryText = showHindi
@@ -136,37 +139,79 @@ export default function ForecastOutput({
             Procurement list
           </h3>
           {procurementList.length ? (
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {procurementList.map((item, index) => (
-                <div
-                  key={`${item.item}-${item.quantity}`}
-                  className={`flex items-center justify-between rounded-xl border border-(--color-border) px-4 py-3 ${
-                    index % 2 === 0
-                      ? 'bg-(--color-bg-card)'
-                      : 'bg-(--color-bg-input)'
-                  }`}
-                >
-                  <div>
+            <div className="mt-4 overflow-hidden rounded-xl border border-(--color-border)">
+              <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-3 border-b border-(--color-border) bg-(--color-bg-input) px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-(--color-text-muted)">
+                <span>Item</span>
+                <span>Total Needed</span>
+                <span>You Have</span>
+                <span>Buy Today</span>
+              </div>
+              {procurementList.map((item, index) => {
+                const rowClass =
+                  index % 2 === 0
+                    ? 'bg-(--color-bg-card)'
+                    : 'bg-(--color-bg-input)'
+                const totalNeeded = item.totalNeeded ?? item.quantity ?? '--'
+                const alreadyHave = item.alreadyHave ?? '--'
+                const toBuy = item.toBuy ?? '--'
+                const priority = item.priority ?? 'moderate'
+
+                return (
+                  <div
+                    key={`${item.item}-${index}`}
+                    className={`grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-3 px-4 py-3 ${rowClass}`}
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-(--color-text-primary)">
+                        {item.item}
+                      </p>
+                      {item.note ? (
+                        <p className="mt-1 text-xs text-(--color-text-muted)">
+                          {item.note}
+                        </p>
+                      ) : null}
+                      <span
+                        className={`mt-2 inline-flex rounded-full border px-3 py-1 text-[0.65rem] font-semibold ${getPriorityStyles(priority)}`}
+                      >
+                        {priority}
+                      </span>
+                    </div>
                     <p className="text-sm font-semibold text-(--color-text-primary)">
-                      {item.item}
+                      {totalNeeded}
                     </p>
-                    <p className="text-xs text-(--color-text-muted)">
-                      {item.quantity} · {item.unit}
+                    <p className="text-sm font-semibold text-(--color-text-primary)">
+                      {alreadyHave}
+                    </p>
+                    <p className="text-sm font-semibold text-(--color-text-primary)">
+                      {toBuy}
                     </p>
                   </div>
-                  <span
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${getPriorityStyles(item.priority)}`}
-                  >
-                    {item.priority}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <p className="mt-4 text-sm text-(--color-text-muted)">
               Procurement list unavailable. Regenerate to fetch a fresh plan.
             </p>
           )}
+
+          {sufficientStockItems.length ? (
+            <div className="mt-4 rounded-2xl border border-[rgba(74,222,128,0.4)] bg-[rgba(74,222,128,0.12)] p-4">
+              <p className="text-sm font-semibold text-(--color-success)">
+                ✅ Sufficient Stock — no purchase needed
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {sufficientStockItems.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-[rgba(74,222,128,0.4)] bg-[rgba(74,222,128,0.16)] px-3 py-1 text-xs font-semibold text-(--color-success)"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-6 rounded-2xl border border-(--color-border) bg-[rgba(245,158,11,0.12)] p-5">

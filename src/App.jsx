@@ -5,7 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from './utils/firebase'
 import HomePage from './pages/HomePage'
 import LandingPage from './pages/LandingPage'
-import SetupPage from './pages/SetupPage'
+import ProfilePage from './pages/ProfilePage'
 import ForecastPage from './pages/ForecastPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
@@ -52,7 +52,15 @@ export default function App() {
                 path="/setup"
                 element={
                   <RequireAuth>
-                    <SetupPage />
+                    <Navigate to="/profile" replace />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <RequireAuth>
+                    <ProfilePage />
                   </RequireAuth>
                 }
               />
