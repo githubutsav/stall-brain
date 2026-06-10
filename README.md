@@ -116,12 +116,12 @@ Your stall profile saves permanently. Each forecast lets you make temporary adju
 |---|---|
 | Frontend | React 19 + Vite |
 | Styling | Tailwind CSS v4 + CSS Variables |
-| Auth | Supabase (signup / login / session) |
+| Auth | Firebase (signup / login / session) |
 | Routing | React Router v6 |
 | AI / LLM | Groq API — `llama-3.3-70b-versatile` |
 | Weather | Open-Meteo API (free, no key required) |
 | Icons | Lucide React |
-| Storage | Supabase (auth) + localStorage (forecast history, session) |
+| Storage | Firebase (auth) + localStorage (forecast history, session) |
 | Deployment | Vercel |
 
 Coding Agent used : Copilot with GPT Codex
